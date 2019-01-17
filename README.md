@@ -7,8 +7,6 @@ Generic container for launching a firecracker microVM inside a Docker container
 > * Uses macvtap tun devices for best network throughput   
 > * Outputs serial console to stdio, thus visible using docker logs   
 
-Partially based on [BBVA/kvm](https://github.com/BBVA/kvm)
-
 ### Getting Started :
 
 #### Build the docker container 

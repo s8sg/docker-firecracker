@@ -13,7 +13,7 @@ ENV container docker
 
 RUN apk add curl qemu-system-x86_64 libvirt \ 
     && apk add libvirt-daemon dbus polkit \
-    && apk add qemu-img 
+    && apk add qemu-img bash iproute2 e2fsprogs 
 
 RUN curl -LOJ https://github.com/firecracker-microvm/firecracker/releases/download/v0.13.0/firecracker-v0.13.0 \
     && mv firecracker-v0.13.0 /usr/local/bin/firecracker \
