@@ -127,32 +127,41 @@ generateNetdevNames () {
 setupTap () {
   set -x
   local iface="$1"
-  local mode="$2"
-  local deviceID=$(generateNetdevNames $mode)
-  local tapName="$mode-$deviceID"
+  local tapName="$2"
+  local bridgeName="$3"
 
-  ip tuntap add mode tap $tapName
+
+  ip link add name $bridgeName type bridge
+  ip link set $bridgeName address "$MAC"
+  ip link set dev $bridgeName up
+
+  #sysctl -w net.ipv4.ip_forward=1
+
+  iptables --table nat --append POSTROUTING --out-interface $iface -j MASQUERADE
+  iptables --insert FORWARD --in-interface br0 -j ACCEPT
   
+  ip tuntap add mode tap $tapName
+  brctl addif $bridgeName $tapName
+
   set +x
   # get a new IP for the guest machine
   if ! [[ -z $IP ]]; then
     newIP=($(getNonConflictingIP $IP $CIDR))
-    #ip addr del "$IP/$CIDR" dev "$iface"
+    ip addr del "$IP/$CIDR" dev "$iface"
     
-    ip addr add "172.17.0.99/24" dev "$tapName"
-    #ip addr add "${newIP[0]}/${newIP[1]}" dev "$tapName"
+    #ip addr add "172.17.0.99/24" dev "$tapName"
+    ip addr add 172.17.0.1/24 dev $tapName
+    #ip addr add "${newIP[0]}/${newIP[1]}" dev "$bridgeName"
   fi
 
-  iptables -t nat -A POSTROUTING -o $iface -j MASQUERADE
-  iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-  iptables -A FORWARD -i $tapName -o $iface -j ACCEPT
+  #iptables -t nat -A POSTROUTING -o $iface -j MASQUERADE
+  #iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+  #iptables -A FORWARD -i $tapName -o $iface -j ACCEPT
    
   ip link set dev "$tapName" up
 
   # Append MAC and respective IP address to the net-conf file
   echo -e "$MAC=$IP/$CIDR\n" >> /tmp/net-conf
-
-  echo $tapName
 }
 
 
@@ -181,14 +190,17 @@ configureNetworks () {
     # use container MAC address ($MAC) for tap device
     # and generate a new one for the local interface
     ip link set $iface down
-    mac = "$(genMAC)"
-    ip link set $iface address $mac
+    ip link set $iface address $(genMAC)
     ip link set $iface up
 
     FIRECTL_NET_OPTS=""
 
+    local deviceID=$(generateNetdevNames "bridge")
+    local tapName="tap-$deviceID"
+    local bridgeName="bridge-$deviceID"
+
     # setup the tap device for connecting the VM
-    tapName=$(setupTap $iface "tap")
+    setupTap $iface $tapName $bridgeName
     # firectl configuration:
     FIRECTL_NET_OPTS="$FIRECTL_NET_OPTS --tap-device=$tapName/$MAC"
 

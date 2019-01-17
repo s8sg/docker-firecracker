@@ -23,7 +23,14 @@ ls /mnt/hostconffs-mount
 
 ifconfig eth0 up
 ip addr add 172.17.0.3/24 dev eth0
-ip route add default via 172.17.0.99
+ip route add default via 172.17.0.1
+
+# TODO - Remove debug
+cat /etc/resolv.conf
+ifconfig -a
+
+umount /mnt/hostconffs-mount
+rm -rf /mnt/hostconffs-mount
 
 # run program. the firecracker compiler would place this here.
 echo Running user program
