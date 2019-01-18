@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ "$#" -ne 2 ]; then
+	    echo "Illegal number of parameters"
+	    echo "build <program-dir> <roofs-filename>"
+	    exit 1
+fi
+
+if [ $1 == 'help' ]; then
+	echo "build <program-dir> <roofs-filename>"
+	exit 0
+fi
+
+CODEDIR="$(readlink -f $1)"
+docker run --rm --privileged -v $CODEDIR:/opt/code s8sg/microvm-base-go:latest
+
+ROOTFSDIR="$(readlink -f $2)"
+mv $CODEDIR/rootfs $ROOTFSDIR
+echo "Root filesystem created as: $ROOTFSDIR"
