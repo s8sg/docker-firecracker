@@ -7,18 +7,24 @@ Generic container for launching a firecracker microVM inside a Docker container
 
 ### Getting Started :
 
-#### Build the docker container 
+### Build the docker container 
 ```sh 
 git clone https://github.com/s8sg/docker-firecracker
 cd docker-firecracker
-docker build -t s8sg/docker-firecracker:0.1.0 .
+make
 ```
 
-#### Running
+### Build your root fs using fs-base `currently only supported GO`
+```sh
+./build-fs ./my-go-app my_root_fs
+```
+
+### Running
 ```sh
 docker run                                        \
       -td                                         \
       --privileged                                \
-      -v /path_to/image_file.qcow2:/rootfs/image  \
-      s8sg/docker-firecracker:0.1.0
+      -v /path_to/my_root_fs:/rootfs/image        \
+      -p <port>:<port>                            \
+      s8sg/docker-firecracker
 ```
