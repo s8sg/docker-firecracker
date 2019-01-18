@@ -2,9 +2,7 @@
 
 Generic container for launching a firecracker microVM inside a Docker container
 
-> * It attaches to the VM as many NICs as the docker container has    
-> * The VM gets the original container IPs   
-> * Uses macvtap tun devices for best network throughput   
+> * It attaches to the VM as many NICs as the docker container has 
 > * Outputs serial console to stdio, thus visible using docker logs   
 
 ### Getting Started :
