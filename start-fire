@@ -128,40 +128,35 @@ setupTap () {
   set -x
   local iface="$1"
   local tapName="$2"
-  local bridgeName="$3"
 
 
-  ip link add name $bridgeName type bridge
-  ip link set $bridgeName address "$MAC"
-  ip link set dev $bridgeName up
+  NAMESERVER=`grep "nameserver " /etc/resolv.conf | cut -f 2 -d ' '`
+  NAMESERVERS=`echo ${NAMESERVER[*]} | sed "s/ /,/g"`
+  NETWORK_IP="${NETWORK_IP:-$(echo 172.$((RANDOM%(31-16+1)+16)).$((RANDOM%256)).$((RANDOM%(254-2+1)+2)))}"
+  NETWORK_SUB=`echo $NETWORK_IP | cut -f1,2,3 -d\.`
+  NETWORK_GW="${NETWORK_GW:-$(echo ${NETWORK_SUB}.1)}"
 
-  #sysctl -w net.ipv4.ip_forward=1
-
-  iptables --table nat --append POSTROUTING --out-interface $iface -j MASQUERADE
-  iptables --insert FORWARD --in-interface br0 -j ACCEPT
-  
+ 
   ip tuntap add mode tap $tapName
-  brctl addif $bridgeName $tapName
 
-  set +x
-  # get a new IP for the guest machine
-  if ! [[ -z $IP ]]; then
-    newIP=($(getNonConflictingIP $IP $CIDR))
-    ip addr del "$IP/$CIDR" dev "$iface"
-    
-    #ip addr add "172.17.0.99/24" dev "$tapName"
-    ip addr add 172.17.0.1/24 dev $tapName
-    #ip addr add "${newIP[0]}/${newIP[1]}" dev "$bridgeName"
-  fi
+  dnsmasq --user=root \
+	  --dhcp-range=$NETWORK_IP,$NETWORK_IP \
+	  --dhcp-option=option:router,$NETWORK_GW \
+          --dhcp-option=option:dns-server,$NAMESERVERS
 
-  #iptables -t nat -A POSTROUTING -o $iface -j MASQUERADE
-  #iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-  #iptables -A FORWARD -i $tapName -o $iface -j ACCEPT
-   
+  ip addr add $NETWORK_GW/24 dev $tapName
   ip link set dev "$tapName" up
 
+  iptables -t nat -A POSTROUTING -o $iface -j MASQUERADE
+  iptables -I FORWARD 1 -i $tapName -j ACCEPT
+  iptables -I FORWARD 1 -o $tapName -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+  iptables -t nat -A PREROUTING -d $IP -j DNAT --to-destination $NETWORK_IP
+
+
   # Append MAC and respective IP address to the net-conf file
-  echo -e "$MAC=$IP/$CIDR\n" >> /tmp/net-conf
+  echo -e "IP=$NETWORK_IP" >> /tmp/net-conf
+  echo -e "GATEWAY=$NETWORK_GW" >> /tmp/net-conf
 }
 
 
@@ -173,9 +168,9 @@ configureNetworks () {
   local GATEWAY=$(ip r | grep default | awk '{print $3}')
   local IP
 
-  # Create the net-conf file that will be mounted as env drive
-  echo -e "#IP Configuration\n" >> /tmp/net-conf
+  /sbin/sysctl -w net.ipv4.conf.all.forwarding=1
 
+  # Create the net-conf file that will be mounted as env drive
   for iface in "${local_ifaces[@]}"; do
 
     IPs=$(ip address show dev $iface | grep inet | awk '/inet / { print $2 }' | cut -f1 -d/)
@@ -197,10 +192,9 @@ configureNetworks () {
 
     local deviceID=$(generateNetdevNames "bridge")
     local tapName="tap-$deviceID"
-    local bridgeName="bridge-$deviceID"
 
     # setup the tap device for connecting the VM
-    setupTap $iface $tapName $bridgeName
+    setupTap $iface $tapName
     # firectl configuration:
     FIRECTL_NET_OPTS="$FIRECTL_NET_OPTS --tap-device=$tapName/$MAC"
 

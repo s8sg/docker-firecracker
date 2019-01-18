@@ -6,12 +6,15 @@ rc-service networking start
 mkdir /mnt/hostconffs-mount
 mount /dev/vdb /mnt/hostconffs-mount
 
+# Copy the hosts nameserver
 cp /mnt/hostconffs-mount/resolv.conf /etc/resolv.conf
-cp /mnt/hostconffs-mount/hosts /etc/hosts
 
-ls /mnt/hostconffs-mount
+#cp /mnt/hostconffs-mount/hosts /etc/hosts
 
-# TODO
+# Get IP and GATEWAY configuration from net-conf 
+source /mnt/hostconffs-mount/net-conf
+
+# TODO : For each interface
 #local_ifaces=($(ip link show | grep -v noop | grep state | grep -v LOOPBACK | awk '{print $2}' | tr -d : | sed 's/@.*$//'))
 #for iface in "${local_ifaces[@]}"; do
 #  INTERFACE_MAC=$(ip link show $iface | awk '/ether/ { print $2 }')
@@ -21,16 +24,17 @@ ls /mnt/hostconffs-mount
 #  ip route add default via ${!INTERFACE_MAC} dev $iface
 #  echo "nameserver 8.8.8.8" > /etc/resolv.conf
 
+# Set up IP and GATEWAY
 ifconfig eth0 up
-ip addr add 172.17.0.3/24 dev eth0
-ip route add default via 172.17.0.1
+ifconfig eth0 $IP
+route add default gw $GATEWAY
 
-# TODO - Remove debug
-cat /etc/resolv.conf
-ifconfig -a
-
+# UNDO configuration mount
 umount /mnt/hostconffs-mount
 rm -rf /mnt/hostconffs-mount
+
+#echo "Restarting networking"
+/etc/init.d/networking restart
 
 # run program. the firecracker compiler would place this here.
 echo Running user program
